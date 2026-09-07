@@ -16,7 +16,14 @@ def test_lesotho_mobile_is_supported():
     assert country_for_number("+26658123456") == "LS"
 
 
-@pytest.mark.parametrize("number", ["+12025550123", "+270821234567", "+26618123456", "0821234567"])
+def test_existing_nanp_number_remains_supported():
+    assert validate_phone_number("+12025550123") == "+12025550123"
+
+
+@pytest.mark.parametrize(
+    "number",
+    ["+12005550123", "+270821234567", "+26618123456", "0821234567"],
+)
 def test_unsupported_or_invalid_numbers_are_rejected(number):
     with pytest.raises(ValueError):
         validate_phone_number(number)
