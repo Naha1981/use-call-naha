@@ -16,6 +16,7 @@ NAHA_REPO_URL=${NAHA_REPO_URL:-https://github.com/Naha1981/use-call-naha.git}
 NAHA_REPO_REF=${NAHA_REPO_REF:-nahalabs/naha-desktop-sa-agent}
 NAHA_ROOT=${NAHA_ROOT:-/opt/naha-call}
 NAHA_LLM_MODEL=${NAHA_LLM_MODEL:-llama3.2:3b}
+NAHA_VISION_MODEL=${NAHA_VISION_MODEL:-qwen2.5vl:3b}
 NAHA_PIPER_MODEL=${NAHA_PIPER_MODEL:-en_US-lessac-medium}
 NAHA_DESKTOP_EVENT_URL=${NAHA_DESKTOP_EVENT_URL:-http://127.0.0.1:8766}
 
@@ -91,6 +92,7 @@ if ! command -v ollama >/dev/null 2>&1; then
 fi
 systemctl enable --now ollama.service
 ollama pull "$NAHA_LLM_MODEL"
+ollama pull "$NAHA_VISION_MODEL"
 
 install -m 0755 "$NAHA_ROOT/deploy/telephony/naha-notify-event" /usr/local/bin/naha-notify-event
 install -m 0755 "$NAHA_ROOT/deploy/telephony/naha-call-context" /usr/local/bin/naha-call-context
@@ -102,6 +104,7 @@ NAHA_AUDIOSOCKET_PORT=9092
 NAHA_CALL_CONTEXT_DIR=/var/lib/naha/calls
 NAHA_OLLAMA_URL=http://127.0.0.1:11434
 NAHA_LLM_MODEL=$NAHA_LLM_MODEL
+NAHA_VISION_MODEL=$NAHA_VISION_MODEL
 NAHA_PIPER_MODEL=$NAHA_PIPER_MODEL
 NAHA_PIPER_DATA_DIR=$NAHA_PIPER_DATA_DIR
 NAHA_LOG_LEVEL=INFO
