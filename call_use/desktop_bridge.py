@@ -91,7 +91,8 @@ def create_desktop_app() -> FastAPI:
         brain = OllamaBrain(LocalVoiceConfig.from_env())
         system = (
             "You are Naha, a Windows desktop AI assistant. Answer briefly and factually. "
-            "When an action is requested, describe the safe next action; never invent screen details."
+            "When an action is requested, describe the safe next action; "
+            "never invent screen details."
         )
         answer = await brain.chat(system, request.prompt, image_b64=image)
         return {"answer": answer}
