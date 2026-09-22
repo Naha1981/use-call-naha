@@ -14,4 +14,14 @@ if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
     throw "Ollama is not installed."
 }
 
+$pairingFile = Join-Path (Get-Location) ".naha-telephony.env"
+if (Test-Path $pairingFile) {
+    Get-Content $pairingFile | ForEach-Object {
+        if ($_ -match '^[s]*([^#=s]+)[s]*=(.*)
+) {
+            [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+        }
+    }
+}
+
 .\.venv\Scripts\python.exe desktop\naha_desktop.py
