@@ -5,6 +5,7 @@ DIRECTION=${1:-unknown}
 NUMBER=${2:-}
 TARGET=${3:-}
 if [[ -f /etc/default/naha-telephony ]]; then
+  # shellcheck disable=SC1091
   source /etc/default/naha-telephony
 fi
 TARGET=${TARGET:-${NAHA_DESKTOP_EVENT_URL:-}}
