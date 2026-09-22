@@ -1,0 +1,13 @@
+# Windows Naha desktop agent
+fastapi>=0.116
+faster-whisper>=1.1
+httpx>=0.28
+mss>=10
+numpy>=2.0
+Pillow>=11
+piper-tts>=1.2
+pynput>=1.8
+pyautogui>=0.9
+sounddevice>=0.5
+uvicorn>=0.35
+webrtcvad-wheels>=2.0.14
