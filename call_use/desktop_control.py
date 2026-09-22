@@ -10,8 +10,6 @@ import webbrowser
 from dataclasses import dataclass
 from typing import Any
 
-from PIL import Image
-
 
 class DesktopActionError(ValueError):
     """Raised when a desktop action is invalid or intentionally blocked."""
@@ -25,21 +23,12 @@ SAFE_APPS = {
 }
 
 SAFE_HOTKEYS = {
-    ("ctrl", "a"),
-    ("ctrl", "c"),
-    ("ctrl", "v"),
-    ("ctrl", "x"),
-    ("ctrl", "f"),
-    ("ctrl", "z"),
-    ("ctrl", "y"),
-    ("alt", "tab"),
-    ("win", "d"),
+    ("ctrl", "a"), ("ctrl", "c"), ("ctrl", "v"), ("ctrl", "x"),
+    ("ctrl", "f"), ("ctrl", "z"), ("ctrl", "y"), ("alt", "tab"), ("win", "d"),
 }
 
 BLOCKED_HOTKEYS = {
-    ("alt", "f4"),
-    ("ctrl", "alt", "delete"),
-    ("ctrl", "shift", "esc"),
+    ("alt", "f4"), ("ctrl", "alt", "delete"), ("ctrl", "shift", "esc"),
 }
 
 
@@ -54,6 +43,7 @@ def capture_screen_jpeg(quality: int = 75) -> bytes:
     """Capture the primary monitor without writing a permanent screenshot."""
     try:
         import mss
+        from PIL import Image
 
         with mss.mss() as sct:
             monitor = sct.monitors[1]
@@ -122,7 +112,7 @@ def execute_desktop_action(action: dict[str, Any]) -> DesktopActionResult:
         if keys not in SAFE_HOTKEYS:
             raise DesktopActionError(f"Hotkey {keys!r} is not on the safe allow-list")
         pyautogui.hotkey(*keys)
-        return DesktopActionResult(True, f"Pressed {"+".join(keys)}")
+        return DesktopActionResult(True, "Pressed " + "+".join(keys))
 
     raise DesktopActionError(f"Unknown desktop action: {action_type!r}")
 
