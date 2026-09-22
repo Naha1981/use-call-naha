@@ -20,7 +20,7 @@ from livekit.api import (
     LiveKitAPI,
     SendDataRequest,
 )
-from mcp.server import FastMCP
+from mcp.server import MCPServer
 
 from call_use.models import CallError, CallErrorCode
 from call_use.phone import validate_caller_id, validate_phone_number
@@ -34,7 +34,7 @@ MAX_TIMEOUT = 3600
 VALID_VOICES = frozenset({"alloy", "echo", "fable", "onyx", "nova", "shimmer"})
 MAX_USER_INFO_SIZE = 10000
 
-mcp = FastMCP(
+mcp = MCPServer(
     "call-use",
     instructions=(
         "Give your AI agent the ability to make phone calls. The 'browser-use' for phones."
