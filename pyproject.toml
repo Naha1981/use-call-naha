@@ -22,13 +22,13 @@ dependencies = [
     "pydantic>=2.0",
     "httpx",
     "click>=8.0",
-    "mcp[server]>=1.0",
+    "mcp[server]>=2.0,<3.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx", "mypy", "hypothesis"]
-local-voice = ["numpy>=2.0", "faster-whisper>=1.1", "piper-tts>=1.2", "webrtcvad-wheels>=2.0.14"]
-desktop = ["numpy>=2.0", "Pillow>=11", "mss>=10", "pynput>=1.8", "pyautogui>=0.9", "sounddevice>=0.5", "faster-whisper>=1.1", "piper-tts>=1.2", "webrtcvad-wheels>=2.0.14"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx", "mypy", "hypothesis", "numpy>=2.0,<2.5"]
+local-voice = ["numpy>=2.0,<2.5", "faster-whisper>=1.1", "piper-tts>=1.2", "webrtcvad-wheels>=2.0.14"]
+desktop = ["numpy>=2.0,<2.5", "Pillow>=11", "mss>=10", "pynput>=1.8", "pyautogui>=0.9", "sounddevice>=0.5", "faster-whisper>=1.1", "piper-tts>=1.2", "webrtcvad-wheels>=2.0.14"]
 docs = ["mkdocs-material>=9.0", "mkdocstrings[python]>=0.24"]
 
 [project.scripts]
