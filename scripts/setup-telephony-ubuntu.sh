@@ -22,7 +22,7 @@ NAHA_PIPER_MODEL=${NAHA_PIPER_MODEL:-en_US-lessac-medium}
 NAHA_DESKTOP_EVENT_URL=${NAHA_DESKTOP_EVENT_URL:-http://127.0.0.1:8766}
 
 apt-get update
-apt-get install -y curl ca-certificates git python3 python3-venv python3-pip jq openssl alsa-utils modemmanager
+apt-get install -y curl ca-certificates git python3 python3-venv python3-pip jq openssl alsa-utils modemmanager asterisk
 
 ARCH=$(dpkg --print-architecture)
 RELEASE_JSON=$(curl -fsSL https://api.github.com/repos/koreapyj/asterisk-chan-modemmanager/releases/latest)
@@ -201,6 +201,18 @@ systemctl restart asterisk.service || systemctl enable --now asterisk.service
 
 asterisk -rx 'dialplan reload' >/dev/null 2>&1 || true
 asterisk -rx 'manager reload' >/dev/null 2>&1 || true
+
+if ! asterisk -rx 'module show like res_audiosocket' | grep -q 'res_audiosocket'; then
+  echo 'ERROR: Asterisk res_audiosocket is not available.' >&2
+  echo 'Install an Asterisk build with AudioSocket support before continuing.' >&2
+  exit 2
+fi
+
+if ! asterisk -rx 'module show like chan_modemmanager' | grep -q 'chan_modemmanager'; then
+  echo 'ERROR: chan_modemmanager did not load.' >&2
+  asterisk -rx 'module show like modemmanager' || true
+  exit 3
+fi
 
 echo
 echo 'Naha telephony bootstrap complete.'
