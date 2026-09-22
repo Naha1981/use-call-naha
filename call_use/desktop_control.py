@@ -6,6 +6,7 @@ import base64
 import io
 import os
 import subprocess
+import time
 import webbrowser
 from dataclasses import dataclass
 from typing import Any
@@ -23,12 +24,38 @@ SAFE_APPS = {
 }
 
 SAFE_HOTKEYS = {
-    ("ctrl", "a"), ("ctrl", "c"), ("ctrl", "v"), ("ctrl", "x"),
-    ("ctrl", "f"), ("ctrl", "z"), ("ctrl", "y"), ("alt", "tab"), ("win", "d"),
+    ("ctrl", "a"),
+    ("ctrl", "c"),
+    ("ctrl", "v"),
+    ("ctrl", "x"),
+    ("ctrl", "f"),
+    ("ctrl", "z"),
+    ("ctrl", "y"),
+    ("alt", "tab"),
+    ("win", "d"),
 }
 
 BLOCKED_HOTKEYS = {
-    ("alt", "f4"), ("ctrl", "alt", "delete"), ("ctrl", "shift", "esc"),
+    ("alt", "f4"),
+    ("ctrl", "alt", "delete"),
+    ("ctrl", "shift", "esc"),
+}
+
+SAFE_PRESS_KEYS = {
+    "enter",
+    "esc",
+    "tab",
+    "space",
+    "backspace",
+    "home",
+    "end",
+    "pageup",
+    "pagedown",
+    "left",
+    "right",
+    "up",
+    "down",
+    "f5",
 }
 
 
@@ -37,6 +64,18 @@ class DesktopActionResult:
     ok: bool
     message: str
     data: dict[str, Any] | None = None
+
+
+def _pyautogui():
+    try:
+        import pyautogui
+    except ImportError as exc:
+        raise DesktopActionError(
+            "pyautogui is not installed; run the desktop setup script first"
+        ) from exc
+    pyautogui.FAILSAFE = True
+    pyautogui.PAUSE = 0.05
+    return pyautogui
 
 
 def capture_screen_jpeg(quality: int = 75) -> bytes:
@@ -57,14 +96,11 @@ def capture_screen_jpeg(quality: int = 75) -> bytes:
 
 
 def execute_desktop_action(action: dict[str, Any]) -> DesktopActionResult:
-    """Execute an allow-listed desktop action."""
-    try:
-        import pyautogui
-    except ImportError as exc:
-        raise DesktopActionError(
-            "pyautogui is not installed; run the desktop setup script first"
-        ) from exc
+    """Execute one small, allow-listed desktop action."""
+    if not isinstance(action, dict):
+        raise DesktopActionError("Desktop action must be an object")
 
+    pyautogui = _pyautogui()
     action_type = str(action.get("type", "")).strip().lower()
 
     if action_type == "open_url":
@@ -76,6 +112,9 @@ def execute_desktop_action(action: dict[str, Any]) -> DesktopActionResult:
 
     if action_type == "open_app":
         app = str(action.get("app", "")).strip().lower()
+        if app == "browser":
+            webbrowser.open("about:blank")
+            return DesktopActionResult(True, "Opened the default browser")
         command = SAFE_APPS.get(app)
         if not command:
             raise DesktopActionError(f"Application {app!r} is not on the safe allow-list")
@@ -91,16 +130,41 @@ def execute_desktop_action(action: dict[str, Any]) -> DesktopActionResult:
         pyautogui.write(text, interval=0.002)
         return DesktopActionResult(True, f"Typed {len(text)} characters")
 
-    if action_type in {"click", "move"}:
+    if action_type in {"click", "double_click", "right_click", "move"}:
         x = action.get("x")
         y = action.get("y")
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise DesktopActionError(f"{action_type} requires numeric x and y")
+
+        point = (float(x), float(y))
         if action_type == "click":
-            pyautogui.click(float(x), float(y))
-            return DesktopActionResult(True, f"Clicked at {int(x)},{int(y)}")
-        pyautogui.moveTo(float(x), float(y), duration=0.15)
-        return DesktopActionResult(True, f"Moved pointer to {int(x)},{int(y)}")
+            pyautogui.click(*point)
+            message = f"Clicked at {int(x)},{int(y)}"
+        elif action_type == "double_click":
+            pyautogui.doubleClick(*point, interval=0.08)
+            message = f"Double-clicked at {int(x)},{int(y)}"
+        elif action_type == "right_click":
+            pyautogui.rightClick(*point)
+            message = f"Right-clicked at {int(x)},{int(y)}"
+        else:
+            pyautogui.moveTo(*point, duration=0.15)
+            message = f"Moved pointer to {int(x)},{int(y)}"
+        return DesktopActionResult(True, message)
+
+    if action_type == "scroll":
+        amount = action.get("amount")
+        if not isinstance(amount, (int, float)):
+            raise DesktopActionError("scroll requires numeric amount")
+        amount = max(-8, min(8, int(amount)))
+        pyautogui.scroll(amount)
+        return DesktopActionResult(True, f"Scrolled {amount}")
+
+    if action_type == "press":
+        key = str(action.get("key", "")).strip().lower()
+        if key not in SAFE_PRESS_KEYS:
+            raise DesktopActionError(f"Key {key!r} is not on the safe allow-list")
+        pyautogui.press(key)
+        return DesktopActionResult(True, f"Pressed {key}")
 
     if action_type == "hotkey":
         raw_keys = action.get("keys")
@@ -114,7 +178,15 @@ def execute_desktop_action(action: dict[str, Any]) -> DesktopActionResult:
         pyautogui.hotkey(*keys)
         return DesktopActionResult(True, "Pressed " + "+".join(keys))
 
-    raise DesktopActionError(f"Unknown desktop action: {action_type!r}")
+    if action_type == "wait":
+        seconds = action.get("seconds", 0.5)
+        if not isinstance(seconds, (int, float)):
+            raise DesktopActionError("wait requires numeric seconds")
+        seconds = max(0.1, min(5.0, float(seconds)))
+        time.sleep(seconds)
+        return DesktopActionResult(True, f"Waited {seconds:.1f}s")
+
+    raise DesktopActionError(f"Unknown desktop action type: {action_type!r}")
 
 
 def screenshot_base64() -> str:
