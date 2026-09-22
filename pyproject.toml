@@ -5,21 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "call-use"
 dynamic = ["version"]
-description = "Open-source outbound call-control runtime for agent builders"
+description = "Open-source call-control runtime with regional and local telephony adapters"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "agent-next"}]
-keywords = ["ai", "agent", "phone", "call", "voice", "livekit", "telephony", "twilio", "sip", "outbound-calls"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Topic :: Communications :: Telephony",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
+keywords = ["ai", "phone", "call", "voice", "telephony", "asterisk", "modemmanager"]
 requires-python = ">=3.11"
 dependencies = [
     "livekit-agents[silero,turn-detector]~=1.4",
@@ -37,20 +27,20 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx", "mypy", "hypothesis"]
-docs = [
-    "mkdocs-material>=9.0",
-    "mkdocstrings[python]>=0.24",
-]
+local-voice = ["numpy>=2.0", "faster-whisper>=1.1", "piper-tts>=1.2", "webrtcvad-wheels>=2.0.14"]
+desktop = ["numpy>=2.0", "Pillow>=11", "mss>=10", "pynput>=1.8", "pyautogui>=0.9", "sounddevice>=0.5", "faster-whisper>=1.1", "piper-tts>=1.2", "webrtcvad-wheels>=2.0.14"]
+docs = ["mkdocs-material>=9.0", "mkdocstrings[python]>=0.24"]
 
 [project.scripts]
 call-use-worker = "call_use.agent:main"
 call-use = "call_use.cli:main"
 call-use-mcp = "call_use.mcp_server:main"
+naha-audiosocket = "call_use.audiosocket_agent:main"
 
 [project.urls]
 Homepage = "https://github.com/agent-next/call-use"
-Repository = "https://github.com/agent-next/call-use"
-Issues = "https://github.com/agent-next/call-use/issues"
+Repository = "https://github.com/Naha1981/use-call-naha"
+Issues = "https://github.com/Naha1981/use-call-naha/issues"
 
 [tool.setuptools.dynamic]
 version = {attr = "call_use._version.__version__"}
@@ -67,7 +57,7 @@ testpaths = ["tests"]
 markers = [
     "unit: Unit tests",
     "bdd: Behavior-driven scenario tests",
-    "integration: Integration tests across modules",
+    "integration: Integration tests",
 ]
 
 [tool.bandit]
