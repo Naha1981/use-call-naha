@@ -23,7 +23,6 @@ from call_use.desktop_control import DesktopActionError, capture_screen_jpeg, ex
 from call_use.local_voice import LocalSTT, LocalTTS, LocalVoiceConfig, OllamaBrain
 from call_use.telephony import DialRequest
 
-
 E164_RE = re.compile(r"\+\d{8,15}")
 
 SYSTEM_PROMPT = """
@@ -37,7 +36,6 @@ Allowed hotkeys are ctrl+a, ctrl+c, ctrl+v, ctrl+x, ctrl+f, ctrl+z, ctrl+y, alt+
 Never invent click coordinates. Use the attached screen image when coordinates are needed.
 Never claim an action happened until the action tool reports success.
 """
-
 
 class NahaDesktop:
     def __init__(self, root: tk.Tk) -> None:
@@ -113,10 +111,7 @@ class NahaDesktop:
     def _start_hotkey(self) -> None:
         try:
             from pynput import keyboard
-            self.listener = keyboard.Listener(
-                on_press=self._hotkey_press,
-                on_release=self._hotkey_release,
-            )
+            self.listener = keyboard.Listener(on_press=self._hotkey_press, on_release=self._hotkey_release)
             self.listener.daemon = True
             self.listener.start()
         except Exception as exc:
@@ -225,6 +220,7 @@ class NahaDesktop:
             from_number=os.getenv("NAHA_CALLER_ID", ""),
             country="ZA" if number.startswith("+27") else "LS",
             call_id="desktop",
+            instructions=instructions,
         )
         try:
             result = asyncio.run(self.provider.dial(request))
@@ -241,11 +237,7 @@ class NahaDesktop:
         self._set_status("Looking…")
         try:
             image_b64 = base64.b64encode(capture_screen_jpeg()).decode("ascii")
-            answer = asyncio.run(self.brain.chat(
-                "Describe only useful visible information from this Windows screen. Keep the answer under 60 words.",
-                "What is on my screen?",
-                image_b64=image_b64,
-            ))
+            answer = asyncio.run(self.brain.chat("Describe only useful visible information from this Windows screen. Keep the answer under 60 words.", "What is on my screen?", image_b64=image_b64))
             self._log("Screen: " + answer)
             self._speak(answer)
         except Exception as exc:
@@ -254,7 +246,7 @@ class NahaDesktop:
             self._set_status("Ready")
 
     def _test_bridge(self) -> None:
-        self._log("Desktop bridge should be listening on 127.0.0.1:8766")
+        self._log("Desktop bridge: 127.0.0.1:8766")
 
     def _set_status(self, value: str) -> None:
         self.root.after(0, lambda: self.status.configure(text=value))
