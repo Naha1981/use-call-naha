@@ -15,8 +15,8 @@ for package in ("piper", "faster_whisper", "ctranslate2"):
     hiddenimports += h
 
 a = Analysis(
-    ["desktop/naha_desktop.py"],
-    pathex=["."],
+    ["naha_desktop.py"],
+    pathex=["desktop", "."],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
