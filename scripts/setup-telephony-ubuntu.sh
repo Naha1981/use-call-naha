@@ -177,12 +177,19 @@ NAHA_EVENT_SECRET=$EVENT_SECRET
 EOF
 chmod 0600 /etc/default/naha-telephony
 
+mkdir -p /etc/systemd/system/asterisk.service.d
+cat > /etc/systemd/system/asterisk.service.d/naha.conf <<EOF
+[Service]
+EnvironmentFile=/etc/default/naha-telephony
+EOF
+
 cat > "$NAHA_ROOT/telephony-client.env" <<EOF
 ASTERISK_AMI_HOST=127.0.0.1
 ASTERISK_AMI_PORT=5038
 ASTERISK_AMI_USER=naha
 ASTERISK_AMI_PASSWORD=$AMI_SECRET
 ASTERISK_MODEMMANAGER_SIM=$SIM_ICCID
+NAHA_EVENT_SECRET=$EVENT_SECRET
 EOF
 chown naha:naha "$NAHA_ROOT/telephony-client.env"
 chmod 0600 "$NAHA_ROOT/telephony-client.env"
@@ -190,7 +197,7 @@ chmod 0600 "$NAHA_ROOT/telephony-client.env"
 systemctl daemon-reload
 systemctl enable --now ModemManager.service
 systemctl enable --now naha-audiosocket.service
-systemctl enable --now asterisk.service
+systemctl restart asterisk.service || systemctl enable --now asterisk.service
 
 asterisk -rx 'dialplan reload' >/dev/null 2>&1 || true
 asterisk -rx 'manager reload' >/dev/null 2>&1 || true
