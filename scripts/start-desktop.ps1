@@ -1,27 +1,47 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
-if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    throw "Desktop environment not found. Run .\scripts\setup-desktop.ps1 first."
+$Python = Join-Path (Get-Location) ".venvScriptspython.exe"
+if (-not (Test-Path $Python)) {
+    throw "Desktop environment not found. Run .scriptssetup-desktop.ps1 first."
 }
 
-$env:NAHA_PIPER_DATA_DIR = Join-Path (Get-Location) ".naha-models\piper"
-$env:NAHA_PIPER_MODEL = "en_US-lessac-medium"
-$env:NAHA_LLM_MODEL = "llama3.2:3b"
-$env:NAHA_VISION_MODEL = "qwen2.5vl:3b"
-
-if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
-    throw "Ollama is not installed."
+$OllamaExe = $null
+$cmd = Get-Command ollama.exe -ErrorAction SilentlyContinue
+if ($cmd) {
+    $OllamaExe = $cmd.Source
 }
 
-$pairingFile = Join-Path (Get-Location) ".naha-telephony.env"
-if (Test-Path $pairingFile) {
-    Get-Content $pairingFile | ForEach-Object {
-        if ($_ -match '^[s]*([^#=s]+)[s]*=(.*)
-) {
-            [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+if (-not $OllamaExe) {
+    $candidatePaths = @(
+        (Join-Path $env:LOCALAPPDATA "ProgramsOllamaollama.exe"),
+        "C:Program FilesOllamaollama.exe"
+    )
+    foreach ($candidate in $candidatePaths) {
+        if (Test-Path $candidate) {
+            $OllamaExe = $candidate
+            break
         }
     }
 }
 
-.\.venv\Scripts\python.exe desktop\naha_desktop.py
+if (-not $OllamaExe) {
+    throw "Ollama is not installed. Run .scriptssetup-desktop.ps1 first."
+}
+
+$env:PATH = (Split-Path $OllamaExe) + ";" + $env:PATH
+$env:PYTHONPATH = "$(Get-Location);$env:PYTHONPATH"
+$env:NAHA_PIPER_DATA_DIR = Join-Path (Get-Location) ".naha-modelspiper"
+$env:NAHA_PIPER_MODEL = "en_US-lessac-medium"
+$env:NAHA_LLM_MODEL = "llama3.2:3b"
+$env:NAHA_VISION_MODEL = "qwen2.5vl:3b"
+
+& $OllamaExe list *> $null
+if ($LASTEXITCODE -ne 0) {
+    Start-Process -FilePath $OllamaExe -ArgumentList "serve" -WindowStyle Hidden
+    Start-Sleep -Seconds 2
+}
+
+Write-Host "Starting Naha desktop agent..." -ForegroundColor Cyan
+& $Python desktop
+aha_desktop.py
