@@ -294,8 +294,21 @@ def run_first_start(root: tk.Tk) -> bool:
 
         def finish() -> None:
             progress.stop()
-            window.grab_release()
-            window.destroy()
+            if result["ok"]:
+                window.grab_release()
+                window.destroy()
+            else:
+                Label(
+                    window,
+                    text="Setup could not finish. Close this window and start Naha again after fixing the issue.",
+                    wraplength=640,
+                    justify="left",
+                ).pack(anchor="w", padx=18, pady=(0, 8))
+                Button(
+                    window,
+                    text="Close",
+                    command=lambda: (window.grab_release(), window.destroy()),
+                ).pack(anchor="e", padx=18, pady=(0, 12))
 
         window.after(0, finish)
 
