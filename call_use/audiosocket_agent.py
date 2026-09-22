@@ -1,16 +1,10 @@
-"""Self-hosted Asterisk AudioSocket conversational agent.
-
-This is intentionally small and provider-free:
-  Asterisk -> 8 kHz PCM -> VAD -> faster-whisper -> Ollama -> Piper -> PCM -> Asterisk
-
-The process supports both inbound calls and outbound calls because Asterisk
-uses the same AudioSocket dialplan for both directions.
-"""
+"""Self-hosted Asterisk AudioSocket conversational agent."""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import struct
@@ -19,7 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from call_use.local_voice import LocalSTT, LocalTTS, OllamaBrain, synthesize_async, transcribe_async, wav_to_pcm16k
+from call_use.local_voice import LocalSTT, LocalTTS, OllamaBrain, synthesize_async, transcribe_async, wav_to_pcm16
 
 LOGGER = logging.getLogger("naha.audiosocket")
 
@@ -28,7 +22,7 @@ UUID_TYPE = 0x01
 DTMF_TYPE = 0x03
 HANGUP_TYPE = 0x00
 ERROR_TYPE = 0xFF
-FRAME_BYTES = 320  # 20 ms of 8 kHz signed 16-bit mono PCM
+FRAME_BYTES = 320
 
 
 @dataclass
@@ -49,6 +43,7 @@ class AudioSocketServer:
         self.stt = LocalSTT()
         self.tts = LocalTTS()
         self.brain = OllamaBrain()
+        self.context_dir = os.getenv("NAHA_CALL_CONTEXT_DIR", "/var/lib/naha/calls")
 
     async def run(self) -> None:
         server = await asyncio.start_server(self.handle, self.host, self.port)
@@ -58,9 +53,8 @@ class AudioSocketServer:
             await server.serve_forever()
 
     async def handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        peer = writer.get_extra_info("peername")
         session = Session(reader=reader, writer=writer)
-        LOGGER.info("Call connected from %s", peer)
+        LOGGER.info("AudioSocket call connected from %s", writer.get_extra_info("peername"))
         try:
             await self._session(session)
         except asyncio.CancelledError:
@@ -69,17 +63,33 @@ class AudioSocketServer:
             LOGGER.exception("AudioSocket session failed")
         finally:
             writer.close()
-            with contextlib_suppress():
+            try:
                 await writer.wait_closed()
+            except Exception:
+                pass
+
+    def _load_context(self, call_uuid: str) -> dict[str, str]:
+        path = os.path.join(self.context_dir, call_uuid + ".json")
+        try:
+            with open(path, encoding="utf-8") as handle:
+                data = json.load(handle)
+            return {str(k): str(v) for k, v in data.items()}
+        except (OSError, ValueError):
+            return {}
 
     async def _session(self, session: Session) -> None:
         first_type, first_payload = await self._read_packet(session.reader)
-        if first_type == UUID_TYPE:
+        if first_type == UUID_TYPE and len(first_payload) == 16:
             session.call_uuid = str(uuid.UUID(bytes=first_payload))
         else:
             session.call_uuid = uuid.uuid4().hex
 
-        await self._speak(session, "Hi, this is Naha. How can I help you today?")
+        context = self._load_context(session.call_uuid)
+        instructions = context.get("instructions", "").strip()
+        greeting = "Hi, this is Naha. How can I help you today?"
+        if instructions:
+            greeting = "Hi, this is Naha. I am calling about a request. How can I help?"
+        await self._speak(session, greeting)
 
         speech = bytearray()
         in_speech = False
@@ -89,7 +99,6 @@ class AudioSocketServer:
 
         while True:
             packet_type, payload = await self._read_packet(session.reader)
-
             if packet_type == HANGUP_TYPE:
                 break
             if packet_type == ERROR_TYPE:
@@ -120,31 +129,37 @@ class AudioSocketServer:
                     in_speech = False
                     silence_frames = 0
                     if playback_task and not playback_task.done():
-                        await _cancel_task(playback_task)
+                        playback_task.cancel()
+                        try:
+                            await playback_task
+                        except asyncio.CancelledError:
+                            pass
                     session.speaking = False
                     transcript = await transcribe_async(self.stt, utterance, 8000)
                     if not transcript:
                         continue
                     LOGGER.info("Caller %s: %s", session.call_uuid, transcript)
-                    response = await self._reply(transcript)
+                    response = await self._reply(transcript, instructions)
                     if response:
                         playback_task = asyncio.create_task(self._speak(session, response))
 
         if playback_task and not playback_task.done():
-            await _cancel_task(playback_task)
+            playback_task.cancel()
 
-    async def _reply(self, transcript: str) -> str:
-        system = os.getenv(
+    async def _reply(self, transcript: str, instructions: str) -> str:
+        base = os.getenv(
             "NAHA_PHONE_SYSTEM_PROMPT",
             "You are Naha, a concise South African phone assistant. "
             "Speak naturally, keep replies under 80 words, never invent facts, "
             "and ask one clear question at a time.",
         )
-        return await self.brain.chat(system, transcript)
+        if instructions:
+            base += "\nOutbound task instructions:\n" + instructions
+        return await self.brain.chat(base, transcript)
 
     async def _speak(self, session: Session, text: str) -> None:
         wav = await synthesize_async(self.tts, text)
-        pcm = wav_to_pcm16k(wav, 8000)
+        pcm = wav_to_pcm16(wav, 8000)
         stop = asyncio.Event()
         session.stop_playback = stop
         session.speaking = True
@@ -173,16 +188,6 @@ class AudioSocketServer:
         return packet_type, payload
 
 
-class contextlib_suppress:
-    """Tiny local context manager to avoid an extra runtime dependency."""
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_args):
-        return True
-
-
 def _split_frames(payload: bytes):
     for start in range(0, len(payload), FRAME_BYTES):
         frame = payload[start : start + FRAME_BYTES]
@@ -198,7 +203,6 @@ def _energy_speech(frame: bytes) -> bool:
 def _make_vad():
     try:
         import webrtcvad
-
         return webrtcvad.Vad(2)
     except ImportError:
         LOGGER.warning("webrtcvad not installed; using energy-based VAD")
