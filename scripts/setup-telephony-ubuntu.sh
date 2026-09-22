@@ -24,31 +24,34 @@ apt-get install -y curl ca-certificates git python3 python3-venv python3-pip jq 
 
 ARCH=$(dpkg --print-architecture)
 RELEASE_JSON=$(curl -fsSL https://api.github.com/repos/koreapyj/asterisk-chan-modemmanager/releases/latest)
-DRIVER_URL=$(printf '%s' "$RELEASE_JSON" | python3 - "$VERSION_ID" "$ARCH" <<'PY'
+DRIVER_URL=$(printf '%s' "$RELEASE_JSON" | python3 -c '
 import json
-import re
 import sys
 
 version, arch = sys.argv[1:3]
 data = json.load(sys.stdin)
-assets = [a for a in data.get('assets', []) if a.get('name', '').endswith('.deb')]
+assets = [a for a in data.get("assets", []) if a.get("name", "").endswith(".deb")]
 preferred = []
 for asset in assets:
-    name = asset['name'].lower()
+    name = asset["name"].lower()
     score = 0
-    if arch in name or (arch == 'amd64' and 'x86_64' in name): score += 10
-    if version in name: score += 20
-    if version == '24.04' and 'noble' in name: score += 15
-    if version == '26.04' and ('resolute' in name or '26.04' in name): score += 15
-    preferred.append((score, asset['browser_download_url'], asset['name']))
+    if arch in name or (arch == "amd64" and "x86_64" in name):
+        score += 10
+    if version in name:
+        score += 20
+    if version == "24.04" and "noble" in name:
+        score += 15
+    if version == "26.04" and ("resolute" in name or "26.04" in name):
+        score += 15
+    preferred.append((score, asset["browser_download_url"], asset["name"]))
 preferred.sort(reverse=True)
 if not preferred or preferred[0][0] == 0:
-    print('Could not identify a matching Ubuntu/AArch64/Amd64 driver package.', file=sys.stderr)
+    print("Could not identify a matching Ubuntu/AArch64/Amd64 driver package.", file=sys.stderr)
     for _, _, name in preferred:
         print(name, file=sys.stderr)
     raise SystemExit(2)
 print(preferred[0][1])
-PY
+' "$VERSION_ID" "$ARCH"
 )
 
 curl -fsSL "$DRIVER_URL" -o /tmp/asterisk-chan-modemmanager.deb
