@@ -12,8 +12,8 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import os
 import re
-import subprocess
 import tempfile
 import wave
 from dataclasses import dataclass
@@ -97,26 +97,36 @@ class LocalTTS:
         cleaned = re.sub(r"\s+", " ", text).strip()
         if not cleaned:
             return b""
+        from piper import PiperVoice
+
+        model_path = self._model_path()
+        if not os.path.isfile(model_path):
+            raise RuntimeError(
+                "Piper voice model not found: "
+                + model_path
+                + ". Run python -m piper.download_voices "
+                + self.config.piper_model
+            )
+
         with tempfile.TemporaryDirectory(prefix="naha-piper-") as tmp:
             output = os.path.join(tmp, "speech.wav")
-            command = ["piper", "--model", self.config.piper_model, "--output_file", output]
-            if self.config.piper_data_dir:
-                command[1:1] = ["--data-dir", self.config.piper_data_dir]
-            completed = subprocess.run(
-                command,
-                input=cleaned,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            if completed.returncode != 0:
-                raise RuntimeError(
-                    "Piper failed. Install piper-tts and a compatible voice model. "
-                    + completed.stderr.strip()
-                )
+            voice = PiperVoice.load(model_path)
+            with wave.open(output, "wb") as wav_file:
+                voice.synthesize_wav(cleaned, wav_file)
             with open(output, "rb") as handle:
                 return handle.read()
+
+    def _model_path(self) -> str:
+        candidates: list[str] = []
+        if self.config.piper_data_dir:
+            candidates.extend(
+                [
+                    os.path.join(self.config.piper_data_dir, self.config.piper_model + ".onnx"),
+                    os.path.join(self.config.piper_data_dir, self.config.piper_model),
+                ]
+            )
+        candidates.append(self.config.piper_model)
+        return next((path for path in candidates if os.path.isfile(path)), candidates[0])
 
 
 class OllamaBrain:
