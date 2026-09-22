@@ -1,56 +1,16 @@
-# Python
+# NahaLabs local/runtime files
+.venv/
 __pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
+*.pyc
+.pytest_cache/
+.coverage
+coverage.xml
 dist/
 build/
-.eggs/
-*.egg
-
-# Virtual environment
-.venv/
-venv/
-env/
-
-# Environment variables
-.env
-
-# IDE
-.vscode/
+*.egg-info/
 .idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Recordings and logs (may contain PII)
-recordings/
-logs/
-*.wav
-*.mp3
-
-# LiveKit model files
-*.onnx
-__pycache__/
-
-# MkDocs
-site/
-.coverage
-.hypothesis/
-.superpowers/
-
-# KMS keys and secrets
-KMS/
-
-# Claude / Skill configs (project-local, not for source control)
-CLAUDE.md
-SKILL.md
-
-# Test and coverage artifacts
-test-results.xml
-coverage.xml
-.pytest_cache/
-.ruff_cache/
+.vscode/
+naha-telephony.env
+telephony-client.env
+.naha-models/
+var/

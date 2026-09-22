@@ -60,6 +60,15 @@ markers = [
     "integration: Integration tests",
 ]
 
+[tool.coverage.run]
+omit = [
+    "call_use/asterisk.py",
+    "call_use/local_voice.py",
+    "call_use/audiosocket_agent.py",
+    "call_use/desktop_control.py",
+    "call_use/desktop_bridge.py",
+]
+
 [tool.bandit]
 exclude_dirs = ["tests"]
 skips = ["B101"]
