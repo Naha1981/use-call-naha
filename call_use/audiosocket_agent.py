@@ -16,7 +16,6 @@ import numpy as np
 from call_use.local_voice import LocalSTT, LocalTTS, OllamaBrain, synthesize_async, transcribe_async, wav_to_pcm16
 
 LOGGER = logging.getLogger("naha.audiosocket")
-
 AUDIO_TYPE = 0x10
 UUID_TYPE = 0x01
 DTMF_TYPE = 0x03
@@ -35,8 +34,6 @@ class Session:
 
 
 class AudioSocketServer:
-    """Minimal AsyncIO AudioSocket server for local speech agents."""
-
     def __init__(self, host: str = "127.0.0.1", port: int = 9092) -> None:
         self.host = host
         self.port = port
@@ -47,14 +44,12 @@ class AudioSocketServer:
 
     async def run(self) -> None:
         server = await asyncio.start_server(self.handle, self.host, self.port)
-        sockets = ", ".join(str(sock.getsockname()) for sock in server.sockets or [])
-        LOGGER.info("AudioSocket agent listening on %s", sockets)
+        LOGGER.info("AudioSocket agent listening on %s", self.host + ":" + str(self.port))
         async with server:
             await server.serve_forever()
 
     async def handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         session = Session(reader=reader, writer=writer)
-        LOGGER.info("AudioSocket call connected from %s", writer.get_extra_info("peername"))
         try:
             await self._session(session)
         except asyncio.CancelledError:
@@ -105,7 +100,6 @@ class AudioSocketServer:
                 LOGGER.warning("Asterisk AudioSocket error for %s: %r", session.call_uuid, payload)
                 break
             if packet_type == DTMF_TYPE:
-                LOGGER.info("DTMF %s on %s", payload.decode("ascii", errors="ignore"), session.call_uuid)
                 continue
             if packet_type != AUDIO_TYPE:
                 continue
@@ -138,7 +132,6 @@ class AudioSocketServer:
                     transcript = await transcribe_async(self.stt, utterance, 8000)
                     if not transcript:
                         continue
-                    LOGGER.info("Caller %s: %s", session.call_uuid, transcript)
                     response = await self._reply(transcript, instructions)
                     if response:
                         playback_task = asyncio.create_task(self._speak(session, response))
@@ -149,9 +142,8 @@ class AudioSocketServer:
     async def _reply(self, transcript: str, instructions: str) -> str:
         base = os.getenv(
             "NAHA_PHONE_SYSTEM_PROMPT",
-            "You are Naha, a concise South African phone assistant. "
-            "Speak naturally, keep replies under 80 words, never invent facts, "
-            "and ask one clear question at a time.",
+            "You are Naha, a concise South African phone assistant. Speak naturally, "
+            "keep replies under 80 words, never invent facts, and ask one clear question at a time.",
         )
         if instructions:
             base += "\nOutbound task instructions:\n" + instructions
@@ -209,7 +201,7 @@ def _make_vad():
         return None
 
 
-async def main() -> None:
+async def async_main() -> None:
     parser = argparse.ArgumentParser(description="NahaLabs local Asterisk AudioSocket agent")
     parser.add_argument("--host", default=os.getenv("NAHA_AUDIOSOCKET_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("NAHA_AUDIOSOCKET_PORT", "9092")))
@@ -217,6 +209,10 @@ async def main() -> None:
     await AudioSocketServer(args.host, args.port).run()
 
 
+def main() -> None:
+    asyncio.run(async_main())
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=os.getenv("NAHA_LOG_LEVEL", "INFO"))
-    asyncio.run(main())
+    main()
