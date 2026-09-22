@@ -13,7 +13,14 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from call_use.local_voice import LocalSTT, LocalTTS, OllamaBrain, synthesize_async, transcribe_async, wav_to_pcm16
+from call_use.local_voice import (
+    LocalSTT,
+    LocalTTS,
+    OllamaBrain,
+    synthesize_async,
+    transcribe_async,
+    wav_to_pcm16,
+)
 
 LOGGER = logging.getLogger("naha.audiosocket")
 AUDIO_TYPE = 0x10
@@ -143,7 +150,8 @@ class AudioSocketServer:
         base = os.getenv(
             "NAHA_PHONE_SYSTEM_PROMPT",
             "You are Naha, a concise South African phone assistant. Speak naturally, "
-            "keep replies under 80 words, never invent facts, and ask one clear question at a time.",
+            "keep replies under 80 words, never invent facts, "
+            "and ask one clear question at a time.",
         )
         if instructions:
             base += "\nOutbound task instructions:\n" + instructions
@@ -169,7 +177,12 @@ class AudioSocketServer:
             if session.stop_playback is stop:
                 session.stop_playback = None
 
-    async def _write_packet(self, writer: asyncio.StreamWriter, packet_type: int, payload: bytes) -> None:
+    async def _write_packet(
+        self,
+        writer: asyncio.StreamWriter,
+        packet_type: int,
+        payload: bytes,
+    ) -> None:
         writer.write(struct.pack(">BH", packet_type, len(payload)) + payload)
         await writer.drain()
 
