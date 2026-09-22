@@ -6,6 +6,7 @@ if [[ ${EUID} -ne 0 ]]; then
   exit 1
 fi
 
+# shellcheck disable=SC1091
 source /etc/os-release
 if [[ ${ID} != ubuntu || ( ${VERSION_ID} != 24.04 && ${VERSION_ID} != 26.04 ) ]]; then
   echo 'Naha telephony bootstrap currently targets Ubuntu 24.04 or 26.04.' >&2
