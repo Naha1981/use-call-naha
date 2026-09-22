@@ -10,6 +10,7 @@ build/
 *.egg-info/
 .idea/
 .vscode/
+.naha-telephony.env
 naha-telephony.env
 telephony-client.env
 .naha-models/
