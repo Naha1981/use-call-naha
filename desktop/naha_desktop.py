@@ -25,7 +25,7 @@ import sounddevice as sd
 
 from call_use.desktop_control import DesktopActionError, capture_screen_jpeg, execute_desktop_action
 from call_use.local_voice import LocalSTT, LocalTTS, LocalVoiceConfig, OllamaBrain
-from desktop.naha_runtime import run_first_start
+from naha_runtime import run_first_start
 
 MAX_ACTION_STEPS = 8
 
