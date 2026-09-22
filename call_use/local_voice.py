@@ -41,12 +41,22 @@ class LocalVoiceConfig:
             vision_model=os.getenv("NAHA_VISION_MODEL", cls.vision_model),
             whisper_model=os.getenv("NAHA_WHISPER_MODEL", cls.whisper_model),
             whisper_device=os.getenv("NAHA_WHISPER_DEVICE", cls.whisper_device),
-            whisper_compute_type=os.getenv(
-                "NAHA_WHISPER_COMPUTE_TYPE", cls.whisper_compute_type
-            ),
+            whisper_compute_type=os.getenv("NAHA_WHISPER_COMPUTE_TYPE", cls.whisper_compute_type),
             piper_model=os.getenv("NAHA_PIPER_MODEL", cls.piper_model),
             piper_data_dir=os.getenv("NAHA_PIPER_DATA_DIR") or None,
         )
+
+
+def _resample_pcm16(pcm: bytes, source_rate: int, target_rate: int) -> bytes:
+    if source_rate == target_rate or not pcm:
+        return pcm
+    audio = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+    if audio.size == 0:
+        return b""
+    target_length = max(1, int(round(audio.size * target_rate / source_rate)))
+    old_x = np.linspace(0.0, 1.0, num=audio.size, endpoint=True)
+    new_x = np.linspace(0.0, 1.0, num=target_length, endpoint=True)
+    return np.interp(new_x, old_x, audio).astype(np.int16).tobytes()
 
 
 class LocalSTT:
@@ -70,14 +80,15 @@ class LocalSTT:
     def transcribe_pcm16(self, pcm: bytes, sample_rate: int) -> str:
         if not pcm:
             return ""
-        audio = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+        audio_pcm = _resample_pcm16(pcm, sample_rate, 16000)
+        audio = np.frombuffer(audio_pcm, dtype=np.int16).astype(np.float32) / 32768.0
         model = self._load()
         segments, _ = model.transcribe(audio, beam_size=1, vad_filter=True)
         return " ".join(segment.text.strip() for segment in segments).strip()
 
 
 class LocalTTS:
-    """Local Piper wrapper. CLI invocation keeps the dependency boundary simple."""
+    """Local Piper wrapper."""
 
     def __init__(self, config: LocalVoiceConfig | None = None) -> None:
         self.config = config or LocalVoiceConfig.from_env()
@@ -88,19 +99,12 @@ class LocalTTS:
             return b""
         with tempfile.TemporaryDirectory(prefix="naha-piper-") as tmp:
             output = os.path.join(tmp, "speech.wav")
-            command = [
-                "piper",
-                "--model",
-                self.config.piper_model,
-                "--output_file",
-                output,
-                "--",
-                cleaned,
-            ]
+            command = ["piper", "--model", self.config.piper_model, "--output_file", output]
             if self.config.piper_data_dir:
                 command[1:1] = ["--data-dir", self.config.piper_data_dir]
             completed = subprocess.run(
                 command,
+                input=cleaned,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -109,43 +113,40 @@ class LocalTTS:
             if completed.returncode != 0:
                 raise RuntimeError(
                     "Piper failed. Install piper-tts and a compatible voice model. "
-                    f"{completed.stderr.strip()}"
+                    + completed.stderr.strip()
                 )
             with open(output, "rb") as handle:
                 return handle.read()
 
 
 class OllamaBrain:
-    """Small Ollama client for text and optional image-aware prompts."""
+    """Small Ollama client for text and image-aware prompts."""
 
     def __init__(self, config: LocalVoiceConfig | None = None) -> None:
         self.config = config or LocalVoiceConfig.from_env()
 
     async def chat(self, system: str, user: str, *, image_b64: str | None = None) -> str:
-        content: str | list[dict[str, object]] = user
+        message: dict[str, object] = {"role": "user", "content": user}
         if image_b64:
-            content = [
-                {"type": "text", "text": user},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
-            ]
+            message["images"] = [image_b64]
         payload = {
             "model": self.config.vision_model if image_b64 else self.config.llm_model,
             "stream": False,
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": content},
+                message,
             ],
         }
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(f"{self.config.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
             data = response.json()
-        message = data.get("message", {})
-        return str(message.get("content", "")).strip()
+        message_out = data.get("message", {})
+        return str(message_out.get("content", "")).strip()
 
 
-def wav_to_pcm16k(wav_bytes: bytes, target_rate: int = 8000) -> bytes:
-    """Decode a Piper WAV and resample mono PCM16 to the Asterisk rate."""
+def wav_to_pcm16(wav_bytes: bytes, target_rate: int = 8000) -> bytes:
+    """Decode Piper WAV and resample mono PCM16 to the Asterisk rate."""
     with wave.open(io.BytesIO(wav_bytes), "rb") as source:
         channels = source.getnchannels()
         sample_width = source.getsampwidth()
@@ -156,13 +157,7 @@ def wav_to_pcm16k(wav_bytes: bytes, target_rate: int = 8000) -> bytes:
     audio = np.frombuffer(frames, dtype=np.int16)
     if channels > 1:
         audio = audio.reshape(-1, channels).mean(axis=1).astype(np.int16)
-    if source_rate == target_rate:
-        return audio.tobytes()
-    target_length = max(1, int(round(len(audio) * target_rate / source_rate)))
-    old_x = np.linspace(0.0, 1.0, num=len(audio), endpoint=True)
-    new_x = np.linspace(0.0, 1.0, num=target_length, endpoint=True)
-    resampled = np.interp(new_x, old_x, audio.astype(np.float32)).astype(np.int16)
-    return resampled.tobytes()
+    return _resample_pcm16(audio.tobytes(), source_rate, target_rate)
 
 
 async def transcribe_async(stt: LocalSTT, pcm: bytes, sample_rate: int) -> str:
