@@ -25,6 +25,7 @@ import sounddevice as sd
 
 from call_use.desktop_control import DesktopActionError, capture_screen_jpeg, execute_desktop_action
 from call_use.local_voice import LocalSTT, LocalTTS, LocalVoiceConfig, OllamaBrain
+from desktop.naha_runtime import run_first_start
 
 MAX_ACTION_STEPS = 8
 
@@ -407,6 +408,11 @@ class NahaDesktop:
 
 def main() -> None:
     root = tk.Tk()
+    root.withdraw()
+    if not run_first_start(root):
+        root.destroy()
+        return
+    root.deiconify()
     NahaDesktop(root)
     root.mainloop()
 
