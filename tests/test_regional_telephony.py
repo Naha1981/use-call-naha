@@ -1,6 +1,7 @@
-import pytest
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+import pytest
 
 from call_use.dialing_policy import can_dial_now, country_for_number
 from call_use.phone import validate_caller_id, validate_phone_number
