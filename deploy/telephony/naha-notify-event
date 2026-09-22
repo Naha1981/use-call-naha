@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DIRECTION=${1:-unknown}
+NUMBER=${2:-}
+TARGET=${3:-}
+if [[ -f /etc/default/naha-telephony ]]; then
+  source /etc/default/naha-telephony
+fi
+TARGET=${TARGET:-${NAHA_DESKTOP_EVENT_URL:-}}
+[[ -z $TARGET ]] && exit 0
+
+python3 - "$TARGET" "$NUMBER" "$DIRECTION" <<'PY'
+import json
+import sys
+import urllib.request
+
+target, number, direction = sys.argv[1:4]
+payload = json.dumps({
+    'direction': direction,
+    'from_number': number if direction == 'inbound' else None,
+    'to_number': number if direction == 'outbound' else None,
+    'message': 'Incoming call' if direction == 'inbound' else 'Outgoing call',
+}).encode()
+
+headers = {'Content-Type': 'application/json'}
+try:
+    with open('/etc/default/naha-telephony', encoding='utf-8') as handle:
+        for line in handle:
+            if line.startswith('NAHA_EVENT_SECRET='):
+                headers['X-Event-Secret'] = line.strip().split('=', 1)[1]
+except OSError:
+    pass
+
+url = target.rstrip('/') + '/events/' + direction
+request = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+try:
+    with urllib.request.urlopen(request, timeout=1) as response:
+        response.read()
+except Exception:
+    pass
+PY
