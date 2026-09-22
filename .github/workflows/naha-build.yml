@@ -1,0 +1,57 @@
+name: NahaLabs agent build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Syntax check
+        run: |
+          bash -n scripts/setup-telephony-ubuntu.sh
+          bash -n deploy/telephony/naha-call-context
+          bash -n deploy/telephony/naha-notify-event
+      - name: Shellcheck
+        run: shellcheck scripts/setup-telephony-ubuntu.sh deploy/telephony/naha-call-context deploy/telephony/naha-notify-event
+
+  desktop-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install desktop dependencies
+        run: python -m pip install -r desktop/requirements.txt
+      - name: Compile desktop modules
+        run: |
+          python -m py_compile desktop/naha_desktop.py
+          python -m py_compile call_use/desktop_control.py call_use/desktop_bridge.py call_use/asterisk.py call_use/local_voice.py call_use/audiosocket_agent.py
+      - name: Install PyInstaller
+        run: python -m pip install pyinstaller
+      - name: Build Windows bundle
+        run: pyinstaller --noconfirm --clean --windowed --name NahaDesktop --paths . desktop/naha_desktop.py
+      - name: Zip bundle
+        shell: pwsh
+        run: Compress-Archive -Path dist/NahaDesktop -DestinationPath NahaDesktop-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NahaDesktop-Windows
+          path: NahaDesktop-Windows.zip
+
+  telephony-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile core telephony modules
+        run: |
+          python -m py_compile call_use/telephony.py call_use/asterisk.py call_use/local_voice.py call_use/audiosocket_agent.py
