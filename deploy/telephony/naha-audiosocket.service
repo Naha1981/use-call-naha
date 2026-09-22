@@ -1,0 +1,22 @@
+[Unit]
+Description=NahaLabs local Asterisk AudioSocket AI agent
+After=network.target ollama.service asterisk.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=naha
+Group=naha
+WorkingDirectory=/opt/naha-call
+EnvironmentFile=-/etc/default/naha-audiosocket
+ExecStart=/opt/naha-call/.venv/bin/naha-audiosocket
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/naha/calls
+
+[Install]
+WantedBy=multi-user.target

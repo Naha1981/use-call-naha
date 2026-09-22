@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION=${1:-}
+CALL_UUID=${2:-}
+PAYLOAD=${3:-}
+CONTEXT_DIR=${NAHA_CALL_CONTEXT_DIR:-/var/lib/naha/calls}
+
+python3 - "$ACTION" "$CALL_UUID" "$PAYLOAD" "$CONTEXT_DIR" <<'PY'
+import base64
+import json
+import os
+import re
+import sys
+import tempfile
+import uuid
+
+action, call_uuid, payload, context_dir = sys.argv[1:5]
+uuid.UUID(call_uuid)
+if not re.fullmatch(r'[0-9a-fA-F-]{36}', call_uuid):
+    raise SystemExit('invalid call UUID')
+
+os.makedirs(context_dir, mode=0o770, exist_ok=True)
+path = os.path.join(context_dir, call_uuid + '.json')
+
+if action == 'clear':
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    raise SystemExit(0)
+
+if action != 'set':
+    raise SystemExit('usage: naha-call-context set|clear UUID [base64url]')
+
+instructions = ''
+if payload:
+    padding = '=' * (-len(payload) % 4)
+    instructions = base64.urlsafe_b64decode(payload + padding).decode('utf-8')[:5000]
+
+data = {'instructions': instructions}
+fd, temp_path = tempfile.mkstemp(prefix='.naha-', dir=context_dir, text=True)
+try:
+    with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+        json.dump(data, handle)
+        handle.flush()
+        os.fchmod(handle.fileno(), 0o660)
+    os.replace(temp_path, path)
+finally:
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
+PY
