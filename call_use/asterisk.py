@@ -1,13 +1,9 @@
-"""Asterisk AMI telephony provider for local/SIM-based calling.
-
-This adapter deliberately controls Asterisk rather than a paid PSTN API. The
-SIM, modem and carrier remain outside Python; Asterisk owns the call leg and
-routes media to the local AudioSocket agent.
-"""
+"""Asterisk AMI telephony provider for local/SIM-based calling."""
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 import secrets
 from dataclasses import dataclass
@@ -107,11 +103,16 @@ class AsteriskAMI:
         context: str,
         extension: str,
         caller_id: str | None,
+        variables: Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
     ) -> str:
         reader, writer = await self._open()
         action_id = "naha-" + secrets.token_hex(8)
         try:
+            variable_values = {"NAHA_CALL_ID": action_id}
+            if variables:
+                variable_values.update(variables)
+            variable_text = ",".join(f"{key}={value}" for key, value in variable_values.items())
             fields = {
                 "Action": "Originate",
                 "ActionID": action_id,
@@ -121,7 +122,7 @@ class AsteriskAMI:
                 "Priority": "1",
                 "Timeout": str(timeout_ms or self.config.timeout_ms),
                 "Async": "true",
-                "Variable": f"NAHA_CALL_ID={action_id}",
+                "Variable": variable_text,
             }
             if caller_id:
                 fields["CallerID"] = caller_id
@@ -152,7 +153,7 @@ class AsteriskAMI:
 
 
 class AsteriskTelephonyProvider(TelephonyProvider):
-    """TelephonyProvider implementation backed by Asterisk + a cellular SIM."""
+    """TelephonyProvider backed by Asterisk and a cellular SIM."""
 
     def __init__(self, config: AsteriskConfig | None = None) -> None:
         self.config = config or AsteriskConfig.from_env()
@@ -169,11 +170,17 @@ class AsteriskTelephonyProvider(TelephonyProvider):
 
     async def dial(self, request: DialRequest) -> DialResult:
         channel = self._channel_for(request.to_number)
+        instructions = request.instructions.strip()[:5000]
+        instructions_b64 = base64.urlsafe_b64encode(instructions.encode("utf-8")).decode("ascii")
         provider_call_id = await self.ami.originate(
             channel=channel,
             context=self.config.outbound_context,
             extension="s",
             caller_id=request.from_number or None,
+            variables={
+                "NAHA_DESTINATION": request.to_number,
+                "NAHA_INSTRUCTIONS_B64": instructions_b64,
+            },
         )
         self._active[provider_call_id] = channel
         self._status[provider_call_id] = "dialing"
