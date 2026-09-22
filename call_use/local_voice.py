@@ -25,7 +25,7 @@ import numpy as np
 class LocalVoiceConfig:
     ollama_url: str = "http://127.0.0.1:11434"
     llm_model: str = "llama3.2:3b"
-    vision_model: str = "llama3.2:3b"
+    vision_model: str = "qwen2.5vl:3b"
     whisper_model: str = "base"
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
