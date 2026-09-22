@@ -16,3 +16,7 @@ if (-not (Test-Path ".venv")) {
 Write-Host ""
 Write-Host "Naha desktop setup complete." -ForegroundColor Green
 Write-Host "Run .\scripts\start-desktop.ps1"
+
+.\.venv\Scripts\python.exe -m piper.download_voices en_US-lessac-medium --data-dir .naha-models\piper
+
+Write-Host "Local Piper voice installed." -ForegroundColor Green
